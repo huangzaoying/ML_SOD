@@ -17,6 +17,8 @@ from net.models.SUM import SUM
 from net.configs.config_setting import setting_config
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 train_loss_history = []
 val_loss_history = []
@@ -29,21 +31,21 @@ transform = transforms.Compose(
 )
 
 train_datasets = SODDataset(
-    base_dir="/media/data/WWZ/HZY/ml_hw1/SOD/Saliency-TrainSet",
+    base_dir="../SOD/Saliency-TrainSet",
     transform=transform,
 )
 train_loader = DataLoader(train_datasets, batch_size=8, shuffle=True, num_workers=4)
 
 
 val_dataset = SODDataset(
-    base_dir="/media/data/WWZ/HZY/ml_hw1/SOD/Saliency-TestSet",
+    base_dir="../SOD/Saliency-TestSet",
     transform=transform,
 )
 val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4)
 
 
 def loss_compute(cc, kl, sim, mse):
-    loss1 = -0.02 * cc + 17.6 * kl - 4 * sim
+    loss1 = -2 * cc + 10 * kl - sim
     loss2 = mse
     loss = loss1 + 5 * loss2
     return loss
@@ -195,12 +197,33 @@ for epoch in range(num_epochs):
         print("Early stopping triggered.")
         break
 
-plt.figure(figsize=(10, 6))
-plt.plot(train_loss_history, label="Train Loss")
-plt.plot(val_loss_history, label="Validation Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.title("Training and Validation Loss")
+sns.set_theme(style="whitegrid", palette="muted", font_scale=1.3)
+
+plt.figure(figsize=(12, 6))
+
+plt.plot(
+    range(1, len(train_loss_history) + 1),
+    train_loss_history,
+    label="Train Loss",
+    color="blue",
+    linestyle="-",
+    marker="o",
+    linewidth=2,
+)
+plt.plot(
+    range(1, len(val_loss_history) + 1),
+    val_loss_history,
+    label="Validation Loss",
+    color="red",
+    linestyle="--",
+    marker="s",
+    linewidth=2,
+)
+
+# 添加标签和标题
+plt.xlabel("Epoch", fontsize=14)
+plt.ylabel("Loss", fontsize=14)
+plt.title("Training and Validation Loss", fontsize=16)
 plt.legend()
-plt.grid()
-plt.savefig("loss_curve.png")  # 保存图片到文件
+plt.grid(True, linestyle="--", alpha=0.6)
+plt.savefig("loss_curve.pdf", dpi=600)

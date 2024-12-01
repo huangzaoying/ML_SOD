@@ -353,3 +353,8 @@ datasets/
 *.txt
 
 !requirements.txt
+
+/result*
+/logs
+*.pdf
+*.png

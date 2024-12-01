@@ -18,8 +18,6 @@ class setting_config:
         "depths_decoder": [2, 2, 2, 1],
         "drop_path_rate": 0.3,
         "load_ckpt_path": "./net/pre_trained_weights/vssmsmall_dp03_ckpt_epoch_238.pth",
-        # "load_ckpt_path": "/media/data/WWZ/HZY/ml_hw1/SUM/net/pre_trained_weights/sum_model.pth",
-        # "load_ckpt_path": "/media/data/WWZ/HZY/ml_hw1/SUM/best_model.pth",
     }
 
     datasets = "isic18"

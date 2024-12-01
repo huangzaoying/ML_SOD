@@ -9,6 +9,8 @@ import cv2
 from net.models.SUM import SUM
 from net.configs.config_setting import setting_config
 from utils.data_process_uni import preprocess_img, postprocess_img
+import os
+import subprocess
 
 
 def setup_model(device):
@@ -23,14 +25,13 @@ def setup_model(device):
             drop_path_rate=model_cfg["drop_path_rate"],
         )
         model.load_state_dict(
-            torch.load("net/pre_trained_weights/sum_model.pth", map_location=device)
-            # torch.load(
-            #     "/media/data/WWZ/HZY/ml_hw1/SUM/best_model_1122_01.pth",
-            #     map_location=device,
-            # )
+            torch.load(
+                "/media/data/WWZ/HZY/ml_hw1/ML_SOD/best_model.pth", map_location=device
+            )
         )
         print(
-            "load model from", "/media/data/WWZ/HZY/ml_hw1/SUM/best_model_1122_01.pth"
+            "load model from",
+            "/media/data/WWZ/HZY/ml_hw1/ML_SOD/best_model.pth",
         )
         model.to(device)
         return model
@@ -113,17 +114,41 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = setup_model(device)
 
-    pred_saliency, _ = saliency_map_prediction(
-        args.img_path, args.condition, model, device
-    )
+    folder_path = "../SOD/Saliency-TestSet/Stimuli"
+    gt_path = "../SOD/Saliency-TestSet/FIXATIONMAPS"
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+                file_path = os.path.join(root, file)
+                output_path = os.path.join(
+                    "./results", "/".join(file_path.split("/")[-2:-1])
+                )
+                os.makedirs(output_path, exist_ok=True)
+                pred_saliency, _ = saliency_map_prediction(
+                    file_path, args.condition, model, device
+                )
 
-    filename = os.path.splitext(os.path.basename(args.img_path))[0]
-    hot_output_filename = os.path.join(args.output_path, f"{filename}_saliencymap.png")
-    cv2.imwrite(
-        hot_output_filename,
-        (255 * pred_saliency / pred_saliency.max()).astype(np.uint8),
-    )
-    print(f"Saved HOT saliency map to {hot_output_filename}")
+                filename = os.path.splitext(os.path.basename(file_path))[0]
+                hot_output_filename = os.path.join(
+                    output_path, f"{filename}_saliencymap.png"
+                )
+                cv2.imwrite(
+                    hot_output_filename,
+                    (255 * pred_saliency / pred_saliency.max()).astype(np.uint8),
+                )
+
+                gt_file_path = os.path.join(
+                    gt_path, "/".join(file_path.split("/")[-2:])
+                )
+                output_gt_path = os.path.join(
+                    output_path, file.split(".")[0] + "_gt.jpg"
+                )
+                output_or_path = os.path.join(output_path, file)
+                command = f"cp {gt_file_path} {output_gt_path}"
+                subprocess.run(command, shell=True)
+                command = f"cp {file_path} {output_or_path}"
+                subprocess.run(command, shell=True)
+                print(f"Saved HOT saliency map to {hot_output_filename}")
 
 
 if __name__ == "__main__":

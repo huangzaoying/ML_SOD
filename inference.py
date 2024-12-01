@@ -6,10 +6,9 @@ import torchvision.transforms as transforms
 import torch
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-
 from net.models.SUM import SUM
 from net.configs.config_setting import setting_config
+from utils.data_process_uni import preprocess_img, postprocess_img
 
 
 def setup_model(device):
@@ -24,14 +23,15 @@ def setup_model(device):
             drop_path_rate=model_cfg["drop_path_rate"],
         )
         model.load_state_dict(
-            # torch.load("net/pre_trained_weights/sum_model.pth", map_location=device)
-            torch.load(
-                "/media/data/WWZ/HZY/ml_hw1/SUM/best_model_1122_01.pth",
-                map_location=device,
-            )
+            torch.load("net/pre_trained_weights/sum_model.pth", map_location=device)
+            # torch.load(
+            #     "/media/data/WWZ/HZY/ml_hw1/ML_SOD/best_model.pth",
+            #     map_location=device,
+            # )
         )
         print(
-            "load model from", "/media/data/WWZ/HZY/ml_hw1/SUM/best_model_1122_01.pth"
+            "load model from",
+            "/media/data/WWZ/HZY/ml_hw1/ML_SOD/best_model_1122_02.pth",
         )
         model.to(device)
         return model
@@ -42,16 +42,15 @@ def setup_model(device):
 
 
 def load_and_preprocess_image(img_path):
-    image = Image.open(img_path).convert("RGB")
-    orig_size = image.size
+    img_padded, orig_img = preprocess_img(img_path, channels=3)
+    orig_size = orig_img.shape[:2]
     transform = transforms.Compose(
         [
-            transforms.Resize((256, 256)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
     )
-    image = transform(image)
+    image = transform(Image.fromarray(img_padded))
     return image, orig_size
 
 
@@ -64,8 +63,10 @@ def saliency_map_prediction(img_path, condition, model, device):
     with torch.no_grad():
         pred_saliency = model(img, one_hot_condition)
 
-    pred_saliency = pred_saliency.squeeze().cpu().numpy()
-    return pred_saliency, orig_size
+    restored_pred_saliency = postprocess_img(
+        pred_saliency.squeeze().cpu().numpy(), img_path
+    )
+    return restored_pred_saliency, orig_size
 
 
 def overlay_heatmap_on_image(original_img_path, heatmap_img_path, output_img_path):
@@ -112,38 +113,17 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = setup_model(device)
 
-    pred_saliency, orig_size = saliency_map_prediction(
+    pred_saliency, _ = saliency_map_prediction(
         args.img_path, args.condition, model, device
     )
 
     filename = os.path.splitext(os.path.basename(args.img_path))[0]
     hot_output_filename = os.path.join(args.output_path, f"{filename}_saliencymap.png")
-
-    # Save HOT heatmap
-    plt.figure()
-    plt.imshow(pred_saliency, cmap="gray")
-    plt.axis("off")
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-    buf.seek(0)
-    plt.close()
-
-    img = Image.open(buf)
-    img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGR)
-    img_resized = cv2.resize(img_cv, orig_size, interpolation=cv2.INTER_AREA)
-    cv2.imwrite(hot_output_filename, img_resized)
-
+    cv2.imwrite(
+        hot_output_filename,
+        (255 * pred_saliency / pred_saliency.max()).astype(np.uint8),
+    )
     print(f"Saved HOT saliency map to {hot_output_filename}")
-
-    if args.heat_map_type == "Overlay":
-        overlay_output_filename = os.path.join(
-            args.output_path, f"{filename}_overlay.png"
-        )
-        overlay_heatmap_on_image(
-            args.img_path, hot_output_filename, overlay_output_filename
-        )
-        print(f"Saved overlay image to {overlay_output_filename}")
 
 
 if __name__ == "__main__":

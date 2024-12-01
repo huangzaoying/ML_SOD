@@ -129,3 +129,63 @@ class SODDataset(Dataset):
             "label": label,
         }
         return sample
+
+
+class SODCategoryDataset(Dataset):
+    """
+    单类别显著性数据集。
+    每个实例化的对象只处理一个类别的数据。
+    """
+
+    def __init__(self, base_dir, category, transform=None, num_classes=4):
+        self.base_dir = base_dir
+        self.category = category  # 指定类别
+        self.transform = transform
+        self.num_classes = num_classes
+
+        # Collect data
+        self.data = []
+        stim_path = os.path.join(base_dir, "Stimuli", category)
+        fix_path = os.path.join(base_dir, "FIXATIONMAPS", category)
+
+        if os.path.isdir(stim_path) and os.path.isdir(fix_path):
+            for img_name in os.listdir(stim_path):
+                stim_img_path = os.path.join(stim_path, img_name)
+                fix_img_path = os.path.join(fix_path, img_name)
+                if os.path.isfile(stim_img_path) and os.path.isfile(fix_img_path):
+                    self.data.append((stim_img_path, fix_img_path, 1))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        stim_img_path, fix_img_path, label_idx = self.data[idx]
+
+        # Load image
+        image, _ = preprocess_img(stim_img_path, channels=3)
+        image = Image.fromarray(image)
+        if self.transform:
+            image = self.transform(image)
+
+        saliency, _ = preprocess_img(fix_img_path, channels=1)
+        saliency = np.array(saliency, dtype=np.float32) / 255.0
+        saliency = torch.from_numpy(saliency).unsqueeze(0)
+        # Convert label to one-hot vector
+        label = torch.zeros(self.num_classes)
+        label[label_idx] = 1
+        sample = {
+            "image": image,
+            "saliency": saliency,
+            "label": label,
+        }
+        return sample
+
+
+def get_datasets_by_category(base_dir, transform=None, num_classes=4):
+    categories = sorted(os.listdir(os.path.join(base_dir, "Stimuli")))
+    datasets = {}
+    for category in categories:
+        datasets[category] = SODCategoryDataset(
+            base_dir, category, transform=transform, num_classes=num_classes
+        )
+    return datasets
